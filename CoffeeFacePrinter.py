@@ -19,6 +19,9 @@ class WebcamApp:
         self.file_path = " "
         self.running = True
 
+        # Handle the close button (X)
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_app)
+
         # Create a label to display the webcam feed
         self.video_label = Label(root)
         self.video_label.pack()
@@ -77,6 +80,8 @@ class WebcamApp:
             if self.file_path:
                 cv2.imwrite(self.file_path, frame)
                 print(f"Image saved to {self.file_path}")
+                self.writeMsg(f"Image saved to {self.file_path}")
+                
                 self.capture_button.config(state=tk.DISABLED)
                 self.process_image(self.file_path,self.print_path)
             
@@ -89,6 +94,8 @@ class WebcamApp:
         try:
             async with websockets.connect(uri) as websocket:
                 print(f"Connected to {uri}")
+                self.writeMsg(f"Connected to {uri}")
+                
 
                 # Check if the machine is idle
                 comm_msg = {
@@ -261,18 +268,23 @@ class WebcamApp:
     def exit_app(self):
         """Release the webcam and close the application."""
         self.running = False  # Stop the update loop
-        self.cap.release()
-        self.root.destroy()
+        if self.cap.isOpened():
+            self.cap.release()  # Release the webcam
+        self.root.destroy()  # Close the application window
 
 
-# Run the app with asyncio event loop
 if __name__ == "__main__":
     root = tk.Tk()
     app = WebcamApp(root)
 
-    # Run the Tkinter mainloop alongside asyncio
-    async def run_tk():
-        while True:
-            root.update()
-            await asyncio.sleep(0.01)
-    asyncio.run(run_tk())
+    async def tk_async_mainloop():
+        while app.running:
+            try:
+                root.update()
+                await asyncio.sleep(0.01)  # Allow other tasks to run
+            except tk.TclError as e:
+                if "application has been destroyed" in str(e):
+                    break  # Exit when the app is closed
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(tk_async_mainloop())
