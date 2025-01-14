@@ -1,6 +1,6 @@
 import cv2
 import tkinter as tk
-from tkinter import Button, Label
+from tkinter import Toplevel, Button, Label, Entry
 from PIL import Image, ImageTk
 import os
 import asyncio
@@ -15,9 +15,13 @@ class WebcamApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Webcam Capture")
-
-        self.file_path = " "
+        self.file_path = ""
         self.running = True
+
+        # Default settings
+        self.ip_address = "192.168.1.113"
+        self.port = "8888"
+        self.cup_diameter = "75"
 
         # Handle the close button (X)
         self.root.protocol("WM_DELETE_WINDOW", self.exit_app)
@@ -26,18 +30,19 @@ class WebcamApp:
         self.video_label = Label(root)
         self.video_label.pack()
 
-        # Add buttons for taking a picture and exiting
+        # Add settings button
+        self.settings_button = Button(root, text="⚙️ Settings", command=self.open_settings_window)
+        self.settings_button.pack(pady=10)
+
+        # Add buttons for capturing and exiting
         self.capture_button = Button(root, text="Capture & Print", command=self.start_capture_image)
         self.capture_button.pack(pady=10)
 
         self.exit_button = Button(root, text="Exit", command=self.exit_app)
         self.exit_button.pack(pady=10)
 
-        self.entryPanel = Label(root,bg="grey",height=5,width=90)
+        self.entryPanel = Label(root, bg="grey", height=5, width=90)
         self.entryPanel.pack(pady=10)
-    
-
-        
 
         # Initialize the webcam
         self.cap = cv2.VideoCapture(0)  # 0 for the default webcam
@@ -47,25 +52,58 @@ class WebcamApp:
     def update_frame(self):
         """Update the video frame in the GUI."""
         if not self.cap.isOpened():
-            return  # Exit if the webcam is not open
-        
+            return
+
         if not self.running:
             return
 
         ret, frame = self.cap.read()
         if ret:
-            # Convert the frame to an image compatible with Tkinter
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img = Image.fromarray(frame)
             imgtk = ImageTk.PhotoImage(image=img)
 
-            # Update the video label with the new frame
             self.video_label.imgtk = imgtk
             self.video_label.configure(image=imgtk)
 
-        # Call this method again after a short delay
         if self.running:
             self.root.after(10, self.update_frame)
+
+    def open_settings_window(self):
+        """Open the settings window."""
+        settings_window = Toplevel(self.root)
+        settings_window.title("Settings")
+        settings_window.geometry("300x200")
+
+        # Labels and Entry fields for settings
+        Label(settings_window, text="IP Address:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        ip_entry = Entry(settings_window, width=20)
+        ip_entry.insert(0, self.ip_address)
+        ip_entry.grid(row=0, column=1, pady=5, padx=5)
+
+        Label(settings_window, text="Port Number:").grid(row=1, column=0, pady=5, padx=5, sticky="w")
+        port_entry = Entry(settings_window, width=20)
+        port_entry.insert(0, self.port)
+        port_entry.grid(row=1, column=1, pady=5, padx=5)
+
+        Label(settings_window, text="Cup Diameter (mm):").grid(row=2, column=0, pady=5, padx=5, sticky="w")
+        cup_dia_entry = Entry(settings_window, width=20)
+        cup_dia_entry.insert(0, self.cup_diameter)
+        cup_dia_entry.grid(row=2, column=1, pady=5, padx=5)
+
+        # Save button
+        save_button = Button(settings_window, text="Save", command=lambda: self.save_settings(
+        ip_entry.get(), port_entry.get(), cup_dia_entry.get(), settings_window))
+        save_button.grid(row=3, column=1, pady=10)
+
+    def save_settings(self, ip, port, cup_dia, settings_window):
+        """Save the settings entered by the user."""
+        self.ip_address = ip
+        self.port = port
+        self.cup_diameter = cup_dia
+        print(f"Settings updated: IP={self.ip_address}, Port={self.port}, Cup Diameter={self.cup_diameter}")
+        self.writeMsg(f"Settings updated: IP={self.ip_address}, Port={self.port}, Cup Diameter={self.cup_diameter}")
+        settings_window.destroy()
 
     def start_capture_image(self):
         """Start the asynchronous capture and WebSocket handling."""
@@ -80,13 +118,11 @@ class WebcamApp:
             if self.file_path:
                 cv2.imwrite(self.file_path, frame)
                 print(f"Image saved to {self.file_path}")
-                self.writeMsg(f"Image saved to {self.file_path}")
-                
                 self.capture_button.config(state=tk.DISABLED)
                 self.process_image(self.file_path,self.print_path)
             
-            ip = "192.168.1.113"  # IP address of the coffee maker
-            port = "8888"
+            ip = self.ip_address  # IP address of the coffee maker
+            port = self.port
             await self.websocket_client(ip, port)
 
     async def websocket_client(self, ip, port):
@@ -94,8 +130,6 @@ class WebcamApp:
         try:
             async with websockets.connect(uri) as websocket:
                 print(f"Connected to {uri}")
-                self.writeMsg(f"Connected to {uri}")
-                
 
                 # Check if the machine is idle
                 comm_msg = {
@@ -103,7 +137,6 @@ class WebcamApp:
                     "tag": 1
                 }
                 await websocket.send(json.dumps(comm_msg))
-                self.writeMsg(f"Message sent: {json.dumps(comm_msg)}")
                 print(f"Message sent: {json.dumps(comm_msg)}")
 
                 response = await websocket.recv()
@@ -111,11 +144,10 @@ class WebcamApp:
                 self.writeMsg(response)
 
                 if 'machine is idle' in response.lower():
-                    self.writeMsg("Machine is idle.")
                     print("Machine is idle.")
                     
                     image_data = self.image_to_print(self.print_path)
-                    size = 75
+                    size = int(self.cup_diameter)
                     imagedata = {
                         "code": 2,
                         "tag": 1,
@@ -156,23 +188,29 @@ class WebcamApp:
         except Exception as e:
             print(f"Connection error: {e}")
             self.writeMsg(f"Connection error: {e}")
+            
+
         self.capture_button.config(state=tk.NORMAL)
 
     def image_to_print(self, image_path):
         """Convert the image to Base64 format."""
         try:
             with Image.open(image_path) as img:
-                breakpoint
+                # Resize the image
+
+                # Convert to grayscale
+                #img = img.convert("L")
+
+
                 # Save to buffer in JPEG format
                 from io import BytesIO
                 buffered = BytesIO()
-                img.save(buffered, format="PNG")
+                img.save(buffered, format="JPEG")
                 img_data = buffered.getvalue()
 
                 # Encode to Base64
                 base64_string = base64.b64encode(img_data).decode("utf-8")
                 return f"data:image/jpeg;base64,{base64_string}"
-            
         except Exception as e:
             print(f"Error: {e}")
             return None
@@ -231,15 +269,12 @@ class WebcamApp:
         center = (width // 2, height // 2)
         radius = min(width, height) // 2
 
-        # Create a mask for the circle
-        mask = np.zeros((height, width), dtype=np.uint8)
-        cv2.circle(mask, center, radius, 255, -1)
+        cv2.circle(mask, center, radius, (255, 255, 255), -1)  # White circle on black background
 
-        # Add an alpha channel
-        image_with_alpha = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        image_with_alpha[:, :, 3] = mask  # Set the alpha channel to the circular mask
+        # Apply the mask
+        circular_image = cv2.bitwise_and(image, mask)
 
-        return image_with_alpha
+        return circular_image
 
     def process_image(self,image_path, output_path):
         """Load an image, detect the face, crop and resize it, and apply a circular mask."""
@@ -259,7 +294,13 @@ class WebcamApp:
         # Apply the circular mask
         circular_image = self.apply_circle_mask(cropped_resized_image)
         
-        cv2.imwrite(output_path, circular_image)
+        # Convert the image to RGB (from BGR) for saving with PIL
+        circular_image_rgb = cv2.cvtColor(circular_image, cv2.COLOR_BGR2RGB)
+        
+        # Save the final image
+        final_image = Image.fromarray(circular_image_rgb)
+        final_image.save(output_path)
+        print(f"Image saved to00 {output_path}")
 
     def writeMsg (self,message):
         msgonPanel = "Note :" + message
@@ -273,6 +314,7 @@ class WebcamApp:
         self.root.destroy()  # Close the application window
 
 
+# Run the app with asyncio event loop
 if __name__ == "__main__":
     root = tk.Tk()
     app = WebcamApp(root)
