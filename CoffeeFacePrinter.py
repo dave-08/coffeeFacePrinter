@@ -102,7 +102,7 @@ class WebcamApp:
                 if 'machine is idle' in response.lower():
                     print("Machine is idle.")
                     image_data = self.image_to_print(self.file_path)
-                    size = 70
+                    size = 75
                     imagedata = {
                         "code": 2,
                         "tag": 1,
@@ -151,7 +151,7 @@ class WebcamApp:
                 img = img.resize((800, 800), Image.Resampling.LANCZOS)
 
                 # Convert to grayscale
-                img = img.convert("L")
+                #img = img.convert("L")
 
                 # Save to buffer in JPEG format
                 from io import BytesIO
