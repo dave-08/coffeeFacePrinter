@@ -8,6 +8,7 @@ import websockets
 import base64
 from PIL import Image
 import json
+import numpy as np
 
 
 class WebcamApp:
@@ -71,12 +72,14 @@ class WebcamApp:
         """Capture the current frame, save it, and send it via WebSocket."""
         ret, frame = self.cap.read()
         if ret:
-            self.file_path = os.getcwd() + "/printImg.jpg"
+            self.file_path = os.getcwd() + '\camImg.jpg'
+            self.print_path = os.getcwd() + "\printImg.png"
             if self.file_path:
                 cv2.imwrite(self.file_path, frame)
                 print(f"Image saved to {self.file_path}")
                 self.capture_button.config(state=tk.DISABLED)
-
+                self.process_image(self.file_path,self.print_path)
+            
             ip = "192.168.1.113"  # IP address of the coffee maker
             port = "8888"
             await self.websocket_client(ip, port)
@@ -101,7 +104,8 @@ class WebcamApp:
 
                 if 'machine is idle' in response.lower():
                     print("Machine is idle.")
-                    image_data = self.image_to_print(self.file_path)
+                    
+                    image_data = self.image_to_print(self.print_path)
                     size = 75
                     imagedata = {
                         "code": 2,
@@ -148,10 +152,10 @@ class WebcamApp:
         try:
             with Image.open(image_path) as img:
                 # Resize the image
-                img = img.resize((800, 800), Image.Resampling.LANCZOS)
 
                 # Convert to grayscale
                 #img = img.convert("L")
+
 
                 # Save to buffer in JPEG format
                 from io import BytesIO
@@ -165,6 +169,93 @@ class WebcamApp:
         except Exception as e:
             print(f"Error: {e}")
             return None
+
+    def detect_face(self,image):
+        """Detect face and return the bounding box."""
+        # Load the pre-trained Haar Cascade Classifier for face detection
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+        # Convert the image to grayscale for face detection
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        
+        if len(faces) == 0:
+            return None  # No face detected
+        
+        # Get the first detected face (assuming there's only one face)
+        (x, y, w, h) = faces[0]
+        
+        return (x, y, w, h)
+
+    def crop_and_resize(self,image, face_bbox, output_size=(1800, 1800)):
+    
+        if face_bbox is None:
+            return None
+        
+        x, y, w, h = face_bbox
+        
+        # Calculate the center of the face
+        face_center = (x + w//2, y + h//2)
+        
+        marginScale = 2.5
+        # Define the cropping area (center the face)
+        crop_margin = int((max(w, h)* marginScale)) # Use the larger dimension for cropping
+        crop_x1 = max(face_center[0] - crop_margin // 2, 0)
+        crop_y1 = max(face_center[1] - crop_margin // 2, 0)
+        crop_x2 = min(face_center[0] + crop_margin // 2, image.shape[1])
+        crop_y2 = min(face_center[1] + crop_margin // 2, image.shape[0])
+        
+        cropped_image = image[crop_y1:crop_y2, crop_x1:crop_x2]
+        
+        # Resize the cropped image to 800x800
+        resized_image = cv2.resize(cropped_image, output_size)
+        
+        return resized_image
+
+    def apply_circle_mask(self,image):
+    
+        # Create a black mask of the same size as the image
+        mask = np.zeros_like(image)
+
+        # Create a circular mask
+        height, width = image.shape[:2]
+        center = (width // 2, height // 2)
+        radius = min(width, height) // 2
+
+        cv2.circle(mask, center, radius, (255, 255, 255), -1)  # White circle on black background
+
+        # Apply the mask
+        circular_image = cv2.bitwise_and(image, mask)
+
+        return circular_image
+
+    def process_image(self,image_path, output_path):
+        """Load an image, detect the face, crop and resize it, and apply a circular mask."""
+        # Read the image
+        image = cv2.imread(image_path)
+        
+        # Detect the face
+        face_bbox = self.detect_face(image)
+        
+        # Crop and resize the image
+        cropped_resized_image = self.crop_and_resize(image, face_bbox)
+        
+        if cropped_resized_image is None:
+            print("No face detected.")
+            return
+        
+        # Apply the circular mask
+        circular_image = self.apply_circle_mask(cropped_resized_image)
+        
+        # Convert the image to RGB (from BGR) for saving with PIL
+        circular_image_rgb = cv2.cvtColor(circular_image, cv2.COLOR_BGR2RGB)
+        
+        # Save the final image
+        final_image = Image.fromarray(circular_image_rgb)
+        final_image.save(output_path)
+        print(f"Image saved to00 {output_path}")
 
     def writeMsg (self,message):
         msgonPanel = "Note :" + message
