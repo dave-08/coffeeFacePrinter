@@ -96,6 +96,7 @@ class WebcamApp:
                     "tag": 1
                 }
                 await websocket.send(json.dumps(comm_msg))
+                self.writeMsg(f"Message sent: {json.dumps(comm_msg)}")
                 print(f"Message sent: {json.dumps(comm_msg)}")
 
                 response = await websocket.recv()
@@ -103,6 +104,7 @@ class WebcamApp:
                 self.writeMsg(response)
 
                 if 'machine is idle' in response.lower():
+                    self.writeMsg("Machine is idle.")
                     print("Machine is idle.")
                     
                     image_data = self.image_to_print(self.print_path)
@@ -143,29 +145,27 @@ class WebcamApp:
 
                 else:
                     print("Machine is not idle.")
+                    self.writeMsg("Machine is not idle.")
         except Exception as e:
             print(f"Connection error: {e}")
+            self.writeMsg(f"Connection error: {e}")
         self.capture_button.config(state=tk.NORMAL)
 
     def image_to_print(self, image_path):
         """Convert the image to Base64 format."""
         try:
             with Image.open(image_path) as img:
-                # Resize the image
-
-                # Convert to grayscale
-                #img = img.convert("L")
-
-
+                breakpoint
                 # Save to buffer in JPEG format
                 from io import BytesIO
                 buffered = BytesIO()
-                img.save(buffered, format="JPEG")
+                img.save(buffered, format="PNG")
                 img_data = buffered.getvalue()
 
                 # Encode to Base64
                 base64_string = base64.b64encode(img_data).decode("utf-8")
                 return f"data:image/jpeg;base64,{base64_string}"
+            
         except Exception as e:
             print(f"Error: {e}")
             return None
@@ -224,12 +224,15 @@ class WebcamApp:
         center = (width // 2, height // 2)
         radius = min(width, height) // 2
 
-        cv2.circle(mask, center, radius, (255, 255, 255), -1)  # White circle on black background
+        # Create a mask for the circle
+        mask = np.zeros((height, width), dtype=np.uint8)
+        cv2.circle(mask, center, radius, 255, -1)
 
-        # Apply the mask
-        circular_image = cv2.bitwise_and(image, mask)
+        # Add an alpha channel
+        image_with_alpha = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+        image_with_alpha[:, :, 3] = mask  # Set the alpha channel to the circular mask
 
-        return circular_image
+        return image_with_alpha
 
     def process_image(self,image_path, output_path):
         """Load an image, detect the face, crop and resize it, and apply a circular mask."""
@@ -249,13 +252,7 @@ class WebcamApp:
         # Apply the circular mask
         circular_image = self.apply_circle_mask(cropped_resized_image)
         
-        # Convert the image to RGB (from BGR) for saving with PIL
-        circular_image_rgb = cv2.cvtColor(circular_image, cv2.COLOR_BGR2RGB)
-        
-        # Save the final image
-        final_image = Image.fromarray(circular_image_rgb)
-        final_image.save(output_path)
-        print(f"Image saved to00 {output_path}")
+        cv2.imwrite(output_path, circular_image)
 
     def writeMsg (self,message):
         msgonPanel = "Note :" + message
