@@ -9,7 +9,15 @@ import base64
 from PIL import Image
 import json
 import numpy as np
+import logging
 
+# Initialize logging
+logging.basicConfig(
+    filename="webcam_app.log",  # Log file name
+    level=logging.INFO,  # Log level (INFO, DEBUG, WARNING, ERROR, CRITICAL)
+    format="%(asctime)s [%(levelname)s] %(message)s",  # Log format
+    datefmt="%Y-%m-%d %H:%M:%S"  # Date format
+)
 
 class WebcamApp:
     def __init__(self, root):
@@ -101,7 +109,7 @@ class WebcamApp:
         self.ip_address = ip
         self.port = port
         self.cup_diameter = cup_dia
-        print(f"Settings updated: IP={self.ip_address}, Port={self.port}, Cup Diameter={self.cup_diameter}")
+        logging.info(f"Settings updated: IP={self.ip_address}, Port={self.port}, Cup Diameter={self.cup_diameter}")
         self.writeMsg(f"Settings updated: IP={self.ip_address}, Port={self.port}, Cup Diameter={self.cup_diameter}")
         settings_window.destroy()
 
@@ -117,7 +125,7 @@ class WebcamApp:
             self.print_path = os.getcwd() + "\printImg.png"
             if self.file_path:
                 cv2.imwrite(self.file_path, frame)
-                print(f"Image saved to {self.file_path}")
+                logging.info(f"Image saved to {self.file_path}")
                 self.capture_button.config(state=tk.DISABLED)
                 self.process_image(self.file_path,self.print_path)
             
@@ -129,7 +137,7 @@ class WebcamApp:
         uri = f"ws://{ip}:{port}"
         try:
             async with websockets.connect(uri) as websocket:
-                print(f"Connected to {uri}")
+                logging.info(f"Connected to {uri}")
 
                 # Check if the machine is idle
                 comm_msg = {
@@ -137,14 +145,14 @@ class WebcamApp:
                     "tag": 1
                 }
                 await websocket.send(json.dumps(comm_msg))
-                print(f"Message sent: {json.dumps(comm_msg)}")
+                logging.info(f"Message sent: {json.dumps(comm_msg)}")
 
                 response = await websocket.recv()
-                print(f"Response: {response}")
+                logging.info(f"Response: {response}")
                 self.writeMsg(response)
 
                 if 'machine is idle' in response.lower():
-                    print("Machine is idle.")
+                    logging.info("Machine is idle.")
                     
                     image_data = self.image_to_print(self.print_path)
                     size = int(self.cup_diameter)
@@ -169,24 +177,24 @@ class WebcamApp:
                         self.writeMsg(response)
 
                         if response != response_prev:
-                            print(response)
+                            logging.info(response)
                             self.writeMsg(response)
                         response_prev = response
 
                         if "printing succeeded" in response.lower():
-                            print("Printing Succeeded")
+                            logging.info("Printing Succeeded")
                             self.writeMsg("Printing Succeeded")
                             break
                         elif "printing failed" in response.lower():
-                            print("Printing Failed")
+                            logging.info("Printing Failed")
                             self.writeMsg("Printing Failed")
                             break
 
                 else:
-                    print("Machine is not idle.")
+                    logging.info("Machine is not idle.")
                     self.writeMsg("Machine is not idle.")
         except Exception as e:
-            print(f"Connection error: {e}")
+            logging.info(f"Connection error: {e}")
             self.writeMsg(f"Connection error: {e}")
             
 
@@ -196,23 +204,17 @@ class WebcamApp:
         """Convert the image to Base64 format."""
         try:
             with Image.open(image_path) as img:
-                # Resize the image
-
-                # Convert to grayscale
-                #img = img.convert("L")
-
-
                 # Save to buffer in JPEG format
                 from io import BytesIO
                 buffered = BytesIO()
-                img.save(buffered, format="JPEG")
+                img.save(buffered, format="PNG")
                 img_data = buffered.getvalue()
 
                 # Encode to Base64
                 base64_string = base64.b64encode(img_data).decode("utf-8")
                 return f"data:image/jpeg;base64,{base64_string}"
         except Exception as e:
-            print(f"Error: {e}")
+            logging.info(f"Error: {e}")
             return None
 
     def detect_face(self,image):
@@ -234,7 +236,7 @@ class WebcamApp:
         
         return (x, y, w, h)
 
-    def crop_and_resize(self,image, face_bbox, output_size=(1800, 1800)):
+    def crop_and_resize(self,image, face_bbox, output_size=(800, 800)):
     
         if face_bbox is None:
             return None
@@ -261,18 +263,26 @@ class WebcamApp:
 
     def apply_circle_mask(self,image):
     
-        # Create a black mask of the same size as the image
-        mask = np.zeros_like(image)
+        """Apply a circular mask with a transparent background to the given image."""
+        # Convert image to RGBA (adds an alpha channel for transparency)
+        image_rgba = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+
+        # Create a blank mask with the same dimensions as the image (including alpha channel)
+        mask = np.zeros_like(image_rgba)
 
         # Create a circular mask
         height, width = image.shape[:2]
         center = (width // 2, height // 2)
         radius = min(width, height) // 2
 
-        cv2.circle(mask, center, radius, (255, 255, 255), -1)  # White circle on black background
+        # Draw a white-filled circle on the alpha channel of the mask
+        cv2.circle(mask, center, radius, (255, 255, 255, 255), -1)
 
-        # Apply the mask
-        circular_image = cv2.bitwise_and(image, mask)
+        # Combine the image with the mask to retain only the circular area
+        circular_image = cv2.bitwise_and(image_rgba, mask)
+
+        # Set the alpha channel of the non-circular area to 0 (fully transparent)
+        circular_image[mask[..., 3] == 0] = [0, 0, 0, 0]
 
         return circular_image
 
@@ -294,14 +304,8 @@ class WebcamApp:
         # Apply the circular mask
         circular_image = self.apply_circle_mask(cropped_resized_image)
         
-        # Convert the image to RGB (from BGR) for saving with PIL
-        circular_image_rgb = cv2.cvtColor(circular_image, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(output_path, circular_image)
         
-        # Save the final image
-        final_image = Image.fromarray(circular_image_rgb)
-        final_image.save(output_path)
-        print(f"Image saved to00 {output_path}")
-
     def writeMsg (self,message):
         msgonPanel = "Note :" + message
         self.entryPanel.config(text=msgonPanel)
