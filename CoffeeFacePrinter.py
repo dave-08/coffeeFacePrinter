@@ -220,7 +220,13 @@ class WebcamApp:
     def detect_face(self,image):
         """Detect face and return the bounding box."""
         # Load the pre-trained Haar Cascade Classifier for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        current_directory = os.getcwd()  # Get the current working directory
+        cascade_path = os.path.join(current_directory,'_internal', 'haarcascade_frontalface_default.xml')
+
+        #dist\CoffeeFacePrinter\_internal
+        logging.info("Pre-Trained Face detection file "+cascade_path)
+        
+        face_cascade = cv2.CascadeClassifier(cascade_path)
 
         # Convert the image to grayscale for face detection
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

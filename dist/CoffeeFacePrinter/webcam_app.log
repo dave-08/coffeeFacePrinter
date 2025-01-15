@@ -1,0 +1,21 @@
+2025-01-15 18:52:16 [INFO] Image saved to C:\Users\97152\Desktop\coffeeFacePrinter\dist\CoffeeFacePrinter\camImg.jpg
+2025-01-15 18:52:16 [INFO] Pre-Trained Face detection file C:\Users\97152\Desktop\coffeeFacePrinter\dist\CoffeeFacePrinter\_internal\haarcascade_frontalface_default.xml
+2025-01-15 18:52:27 [INFO] Connection error: timed out during handshake
+2025-01-15 18:53:02 [INFO] Image saved to C:\Users\97152\Desktop\coffeeFacePrinter\dist\CoffeeFacePrinter\camImg.jpg
+2025-01-15 18:53:02 [INFO] Pre-Trained Face detection file C:\Users\97152\Desktop\coffeeFacePrinter\dist\CoffeeFacePrinter\_internal\haarcascade_frontalface_default.xml
+2025-01-15 18:53:04 [INFO] Connected to ws://192.168.1.113:8888
+2025-01-15 18:53:04 [INFO] Message sent: {"code": 1, "tag": 1}
+2025-01-15 18:53:04 [INFO] Response: {"code":1,"tag":1,"msg":"OK,the machine is idle,it can transfer pictures to print."}
+2025-01-15 18:53:04 [INFO] Machine is idle.
+2025-01-15 18:53:05 [INFO] {"code":2,"tag":1,"msg":"OK,Received successfully, start processing data."}
+2025-01-15 18:53:05 [INFO] {"code":1,"tag":5,"msg":"Warning,the machine is running."}
+2025-01-15 18:53:05 [INFO] {"code":2,"tag":4,"msg":"Remind,tray starts to rise."}
+2025-01-15 18:53:05 [INFO] {"code":1,"tag":5,"msg":"Warning,the machine is running."}
+2025-01-15 18:53:10 [INFO] {"code":2,"tag":5,"msg":"Remind,The tray rises to the top."}
+2025-01-15 18:53:10 [INFO] {"code":1,"tag":5,"msg":"Warning,the machine is running."}
+2025-01-15 18:53:27 [INFO] {"code":2,"tag":6,"msg":"Remind,The tray began to fall."}
+2025-01-15 18:53:27 [INFO] {"code":1,"tag":5,"msg":"Warning,the machine is running."}
+2025-01-15 18:53:32 [INFO] {"code":2,"tag":7,"msg":"Remind,Tray down to low end."}
+2025-01-15 18:53:32 [INFO] {"code":1,"tag":5,"msg":"Warning,the machine is running."}
+2025-01-15 18:53:35 [INFO] {"code":2,"tag":8,"msg":"OK,Printing succeeded."}
+2025-01-15 18:53:35 [INFO] Printing Succeeded
